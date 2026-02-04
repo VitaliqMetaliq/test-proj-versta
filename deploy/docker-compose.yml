@@ -1,0 +1,56 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: postgres_db
+    restart: always
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=OrdersDb
+    ports:
+      - 5432:5432
+    volumes:
+      - postgres_db_data:/var/lib/postgresql/data
+    networks:
+      - orders
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d OrdersDb']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ../Orders.Api
+      dockerfile: Dockerfile
+    container_name: orders-api
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
+      - ConnectionStrings__Default=${POSTGRES_CONNECTION}
+    ports:
+      - "5000:80"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - orders
+
+  frontend:
+    build:
+      context: ../orders-app
+      dockerfile: Dockerfile
+    container_name: orders-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - orders
+
+volumes:
+  postgres_db_data:
+
+networks:
+  orders:
+    name: orders
